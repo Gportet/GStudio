@@ -18,7 +18,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
  *  A simple player-controllable third person character
  *  Implements a controllable orbiting camera
  */
-UCLASS(abstract)
+UCLASS()
 class APoliceChaseCharacter : public ACharacter
 {
 	GENERATED_BODY()
@@ -48,6 +48,11 @@ protected:
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
+
+	UPROPERTY(EditAnywhere, Category = "Input")
+		UInputMappingContext* DefaultMappingContext;
+
+	virtual void BeginPlay() override;
 
 public:
 
