@@ -51,8 +51,8 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
-	UPROPERTY(EditAnywhere, Category = "Input")
-		UInputMappingContext* DefaultMappingContext;
+	UPROPERTY(EditAnywhere, Category ="Input")
+	UInputMappingContext* DefaultMappingContext;
 
 	virtual void BeginPlay() override;
 

@@ -62,6 +62,23 @@ void APoliceChaseCharacter::BeginPlay()
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
+	if (GetCapsuleComponent() && GetMesh())
+	{
+		// Set the capsule to ignore the mesh by setting the mesh's collision object type to a channel the capsule ignores
+		GetMesh()->SetCollisionObjectType(ECC_Pawn);
+		GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECollisionResponse::ECR_Ignore);
+	}
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{ 
+		// Set the collision profile to Ragdoll so limbs hit cars, walls, and floors
+		MeshComp->SetCollisionProfileName(FName("Ragdoll"));
+
+		MeshComp->SetSimulatePhysics(true);
+
+		// Force the visual bodies to follow the physics simulation at 100% weight, 
+		// while the hidden skeleton uses your PA_Mannequin motor drives to stay upright.
+		MeshComp->SetAllBodiesPhysicsBlendWeight(1.0f);
+	}
 }
 
 void APoliceChaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
