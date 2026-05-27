@@ -55,6 +55,7 @@ protected:
 	UInputMappingContext* DefaultMappingContext;
 
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
 
 public:
 

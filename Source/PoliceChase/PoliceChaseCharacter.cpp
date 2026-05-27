@@ -48,6 +48,8 @@ APoliceChaseCharacter::APoliceChaseCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+	
+	PrimaryActorTick.bCanEverTick = true;
 }
 
 void APoliceChaseCharacter::BeginPlay()
@@ -78,6 +80,43 @@ void APoliceChaseCharacter::BeginPlay()
 		// Force the visual bodies to follow the physics simulation at 100% weight, 
 		// while the hidden skeleton uses your PA_Mannequin motor drives to stay upright.
 		MeshComp->SetAllBodiesPhysicsBlendWeight(1.0f);
+	}
+}
+
+// helper function 
+static FTransform MakeTransformWithRotation(const FQuat& InRotation)
+{
+	// Create a transform with the given rotation, zero translation, and scale 1
+	return FTransform(InRotation, FVector::ZeroVector, FVector(1.0f, 1.0f, 1.0f));
+}
+
+void APoliceChaseCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (GetMesh() && GetMesh()->IsSimulatingPhysics())
+	{
+		FRotator CapsuleRotation = GetActorRotation();
+
+		if (FBodyInstance* PelvisBody = GetMesh()->GetBodyInstance(FName("pelvis")))
+		{
+			if (PelvisBody)
+			{
+				// Get the current pelvis body rotation as a quaternion
+				FQuat PelvisQuat = PelvisBody->GetUnrealWorldTransform().GetRotation();
+				FQuat TargetQuat = CapsuleRotation.Quaternion();
+
+				// Interpolate between the current and target rotation
+				FQuat BlendedQuat = FQuat::Slerp(PelvisQuat, TargetQuat, FMath::Clamp(5.0f * DeltaTime, 0.0f, 1.0f));
+
+				// Set the transformation of the the body to the blended quaternion
+				FTransform PelvisTrans = MakeTransformWithRotation(BlendedQuat);
+
+				PelvisBody->SetBodyTransform (PelvisTrans, ETeleportType::None);
+
+			}
+		}
+
 	}
 }
 
@@ -162,3 +201,5 @@ void APoliceChaseCharacter::DoJumpEnd()
 	// signal the character to stop jumping
 	StopJumping();
 }
+
+
