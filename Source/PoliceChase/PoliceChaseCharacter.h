@@ -11,6 +11,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
+class UPhysicalAnimationComponent;
 
 struct FInputActionValue;
 
@@ -53,6 +54,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputMappingContext* DefaultMappingContext;
+
+	UPROPERTY(EditAnywhere, Category = "Ragdoll")
+	UPhysicalAnimationComponent* PhysAnimComp;
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;

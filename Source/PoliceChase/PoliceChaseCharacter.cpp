@@ -11,6 +11,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "PoliceChase.h"
+#include "PhysicsEngine/PhysicalAnimationComponent.h"
 
 APoliceChaseCharacter::APoliceChaseCharacter()
 {
@@ -50,6 +51,9 @@ APoliceChaseCharacter::APoliceChaseCharacter()
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 	
 	PrimaryActorTick.bCanEverTick = true;
+
+	PhysAnimComp = CreateDefaultSubobject<UPhysicalAnimationComponent>
+		(TEXT("SomeDescriptiveName"));
 }
 
 void APoliceChaseCharacter::BeginPlay()
@@ -80,6 +84,8 @@ void APoliceChaseCharacter::BeginPlay()
 		// Force the visual bodies to follow the physics simulation at 100% weight, 
 		// while the hidden skeleton uses your PA_Mannequin motor drives to stay upright.
 		MeshComp->SetAllBodiesPhysicsBlendWeight(1.0f);
+	}
+	if (PhysAnimComp && GetMesh()) {
 	}
 }
 
