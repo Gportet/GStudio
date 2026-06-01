@@ -38,7 +38,8 @@ APoliceChaseCharacter::APoliceChaseCharacter()
 
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(GetMesh(), FName("pelvis"));
+	//CameraBoom->SetupAttachment(GetMesh(), FName("pelvis"));
+	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 400.0f;
 	CameraBoom->bUsePawnControlRotation = true;
 
@@ -68,6 +69,7 @@ void APoliceChaseCharacter::BeginPlay()
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
+
 	if (GetCapsuleComponent() && GetMesh())
 	{
 		GetMesh()->SetCollisionObjectType(ECC_Pawn);
