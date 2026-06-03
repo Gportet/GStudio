@@ -59,7 +59,8 @@ protected:
 	UPhysicalAnimationComponent* PhysAnimComp;
 
 	virtual void BeginPlay() override;
-	virtual void Tick(float DeltaTime) override;
+	void InitPhysicalAnimation();
+	FTimerHandle PhysAnimTimerHandle;
 
 public:
 
