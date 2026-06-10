@@ -74,39 +74,7 @@ void APoliceChaseCharacter::BeginPlay()
 	{
 		GetMesh()->SetCollisionObjectType(ECC_Pawn);
 		GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECollisionResponse::ECR_Ignore);
-	}
-	if (USkeletalMeshComponent* MeshComp = GetMesh())
-	{ 
-		MeshComp->SetCollisionProfileName(FName("Ragdoll"));
-		MeshComp->SetSimulatePhysics(true);
-		//MeshComp->SetAllBodiesPhysicsBlendWeight(1.0f);
-		MeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	}
-
-	if (PhysAnimComp && GetMesh()) 
-	{
-		PhysAnimComp->SetSkeletalMeshComponent(GetMesh());
-		//GetMesh()->SetAllBodiesBelowSimulatePhysics("pelvis", true, true);
-
-		GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("pelvis"), true, true);
-
-		//construction and initialization of FPhysicalAnimationData
-		FPhysicalAnimationData PhysicalAnimData;
-		PhysicalAnimData.bIsLocalSimulation = false;
-		PhysicalAnimData.BodyName = FName("pelvis");
-		PhysicalAnimData.OrientationStrength = 1000.f;
-		PhysicalAnimData.AngularVelocityStrength = 100.f;
-		PhysicalAnimData.PositionStrength = 0.f;
-		PhysicalAnimData.VelocityStrength = 0.f;
-		//PhysicalAnimData.MaxLinearForce = 10000.f;
-		//PhysicalAnimData.MaxAngularForce = 10000.f;
-
-		PhysAnimComp->ApplyPhysicalAnimationProfileBelow(
-			FName("pelvis"),
-			FName("PA_Mannequin"),
-			true // bIncludeSelf
-		);
-		//PhysAnimComp->ApplyPhysicalAnimationSettings(FName("pelvis"), PhysicalAnimData);
+		GetMesh()->bUpdateJointsFromAnimation = true; // keeps the mesh rooted to capsule movement
 	}
 
 	GetWorldTimerManager().SetTimer(PhysAnimTimerHandle, this,
@@ -115,18 +83,28 @@ void APoliceChaseCharacter::BeginPlay()
 
 void APoliceChaseCharacter::InitPhysicalAnimation()
 {
-	if (PhysAnimComp && GetMesh())
-	{
-		PhysAnimComp->SetSkeletalMeshComponent(GetMesh());
-		GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("pelvis"), true, true);
-		PhysAnimComp->ApplyPhysicalAnimationProfileBelow(
-			FName("pelvis"),
-			FName("PA_Mannequin"),
-			true
-		);
-	}
-}
+	if (!PhysAnimComp || !GetMesh()) return;
 
+	PhysAnimComp->SetSkeletalMeshComponent(GetMesh());
+
+	FPhysicalAnimationData PhysAnimData;
+	PhysAnimData.bIsLocalSimulation = true;
+	// Stronger springs = less wobbly, weaker = more ragdoll-y.
+	PhysAnimData.OrientationStrength = 1000.f;
+	PhysAnimData.AngularVelocityStrength = 100.f;
+	PhysAnimData.PositionStrength = 1000.f;
+	PhysAnimData.VelocityStrength = 100.f;
+	PhysAnimData.MaxLinearForce = 10000.f;
+	PhysAnimData.MaxAngularForce = 10000.f;
+
+	// Only upper body simulates — legs stay kinematic so walking works
+	PhysAnimComp->ApplyPhysicalAnimationSettingsBelow(FName("spine_01"), PhysAnimData, true);
+
+	GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("spine_01"), true, true);
+	// Explicitly disable simulation on the legs
+	GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("thigh_l"), false, true);
+	GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("thigh_r"), false, true);
+}
 
 void APoliceChaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
