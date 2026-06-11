@@ -70,15 +70,15 @@ void APoliceChaseCharacter::BeginPlay()
 		}
 	}
 
-	if (GetCapsuleComponent() && GetMesh())
+	/*if (GetCapsuleComponent() && GetMesh())
 	{
 		GetMesh()->SetCollisionObjectType(ECC_Pawn);
 		GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECollisionResponse::ECR_Ignore);
-		GetMesh()->bUpdateJointsFromAnimation = true; // keeps the mesh rooted to capsule movement
-	}
+		
+	}*/
 
 	GetWorldTimerManager().SetTimer(PhysAnimTimerHandle, this,
-		&APoliceChaseCharacter::InitPhysicalAnimation, 0.1f, false);
+		&APoliceChaseCharacter::InitPhysicalAnimation, 0.5f, false);
 }
 
 void APoliceChaseCharacter::InitPhysicalAnimation()
@@ -104,6 +104,14 @@ void APoliceChaseCharacter::InitPhysicalAnimation()
 	// Explicitly disable simulation on the legs
 	GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("thigh_l"), false, true);
 	GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("thigh_r"), false, true);
+
+	// Move simulated bones off ECC_Pawn onto a built - in channel that pawns ignore
+	GetMesh()->SetCollisionObjectType(ECC_PhysicsBody);
+	GetMesh()->SetCollisionResponseToAllChannels(ECR_Ignore);
+	// Only block WorldStatic/WorldDynamic so bones don't clip through the floor/walls
+	GetMesh()->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+	GetMesh()->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+	GetMesh()->bUpdateJointsFromAnimation = false; // keeps the mesh rooted to capsule movement
 }
 
 void APoliceChaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
