@@ -10,6 +10,9 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UInputMappingContext;
+class UPhysicalAnimationComponent;
+
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -49,10 +52,15 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
-	UPROPERTY(EditAnywhere, Category = "Input")
-		UInputMappingContext* DefaultMappingContext;
+	UPROPERTY(EditAnywhere, Category ="Input")
+	UInputMappingContext* DefaultMappingContext;
+
+	UPROPERTY(EditAnywhere, Category = "Ragdoll")
+	UPhysicalAnimationComponent* PhysAnimComp;
 
 	virtual void BeginPlay() override;
+	void InitPhysicalAnimation();
+	FTimerHandle PhysAnimTimerHandle;
 
 public:
 
