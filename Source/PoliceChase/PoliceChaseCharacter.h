@@ -59,7 +59,15 @@ protected:
 	UPhysicalAnimationComponent* PhysAnimComp;
 
 	virtual void BeginPlay() override;
+
 	void InitPhysicalAnimation();
+
+	UFUNCTION(BlueprintCallable)
+	void ApplyRagdoll();
+
+	UFUNCTION(BlueprintCallable)
+	void RemoveRagdoll();
+
 	FTimerHandle PhysAnimTimerHandle;
 
 public:

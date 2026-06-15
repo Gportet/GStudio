@@ -114,6 +114,35 @@ void APoliceChaseCharacter::InitPhysicalAnimation()
 	GetMesh()->bUpdateJointsFromAnimation = false; // keeps the mesh rooted to capsule movement
 }
 
+void APoliceChaseCharacter::ApplyRagdoll()
+{
+	
+	GetCharacterMovement()->DisableMovement();
+
+	GetMesh()->SetAllBodiesSimulatePhysics(true);
+	GetMesh()->SetSimulatePhysics(true);
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+void APoliceChaseCharacter::RemoveRagdoll()
+{
+
+	GetMesh()->SetSimulatePhysics(false);
+	GetMesh()->AttachToComponent(GetCapsuleComponent(),
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	GetMesh()->SetRelativeLocationAndRotation(
+		FVector(0.f, 0.f, -90.f),
+		FRotator(0.f, -90.f, 0.f));
+
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+
+	InitPhysicalAnimation();
+}
+
 void APoliceChaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
