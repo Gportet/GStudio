@@ -11,6 +11,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "PoliceChase.h"
+#include "PhysicsEngine/PhysicalAnimationComponent.h"
 
 APoliceChaseCharacter::APoliceChaseCharacter()
 {
@@ -37,6 +38,7 @@ APoliceChaseCharacter::APoliceChaseCharacter()
 
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	//CameraBoom->SetupAttachment(GetMesh(), FName("pelvis"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 400.0f;
 	CameraBoom->bUsePawnControlRotation = true;
@@ -48,6 +50,97 @@ APoliceChaseCharacter::APoliceChaseCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+	
+	PrimaryActorTick.bCanEverTick = true;
+
+	PhysAnimComp = CreateDefaultSubobject<UPhysicalAnimationComponent>
+		(TEXT("PhysicAnimationComponent"));
+}
+
+void APoliceChaseCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		{
+			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		}
+	}
+
+	/*if (GetCapsuleComponent() && GetMesh())
+	{
+		GetMesh()->SetCollisionObjectType(ECC_Pawn);
+		GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECollisionResponse::ECR_Ignore);
+		
+	}*/
+
+	GetWorldTimerManager().SetTimer(PhysAnimTimerHandle, this,
+		&APoliceChaseCharacter::InitPhysicalAnimation, 0.5f, false);
+}
+
+void APoliceChaseCharacter::InitPhysicalAnimation()
+{
+	if (!PhysAnimComp || !GetMesh()) return;
+
+	PhysAnimComp->SetSkeletalMeshComponent(GetMesh());
+
+	FPhysicalAnimationData PhysAnimData;
+	PhysAnimData.bIsLocalSimulation = true;
+	// Stronger springs = less wobbly, weaker = more ragdoll-y.
+	PhysAnimData.OrientationStrength = 1000.f;
+	PhysAnimData.AngularVelocityStrength = 100.f;
+	PhysAnimData.PositionStrength = 1000.f;
+	PhysAnimData.VelocityStrength = 100.f;
+	PhysAnimData.MaxLinearForce = 10000.f;
+	PhysAnimData.MaxAngularForce = 10000.f;
+
+	// Only upper body simulates — legs stay kinematic so walking works
+	PhysAnimComp->ApplyPhysicalAnimationSettingsBelow(FName("spine_01"), PhysAnimData, true);
+
+	GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("spine_01"), true, true);
+	// Explicitly disable simulation on the legs
+	GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("thigh_l"), false, true);
+	GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("thigh_r"), false, true);
+
+	// Move simulated bones off ECC_Pawn onto a built - in channel that pawns ignore
+	GetMesh()->SetCollisionObjectType(ECC_PhysicsBody);
+	GetMesh()->SetCollisionResponseToAllChannels(ECR_Ignore);
+	// Only block WorldStatic/WorldDynamic so bones don't clip through the floor/walls
+	GetMesh()->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+	GetMesh()->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+	GetMesh()->bUpdateJointsFromAnimation = false; // keeps the mesh rooted to capsule movement
+}
+
+void APoliceChaseCharacter::ApplyRagdoll()
+{
+	
+	GetCharacterMovement()->DisableMovement();
+
+	GetMesh()->SetAllBodiesSimulatePhysics(true);
+	GetMesh()->SetSimulatePhysics(true);
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+void APoliceChaseCharacter::RemoveRagdoll()
+{
+
+	GetMesh()->SetSimulatePhysics(false);
+	GetMesh()->AttachToComponent(GetCapsuleComponent(),
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	GetMesh()->SetRelativeLocationAndRotation(
+		FVector(0.f, 0.f, -90.f),
+		FRotator(0.f, -90.f, 0.f));
+
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+
+	InitPhysicalAnimation();
 }
 
 void APoliceChaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -131,3 +224,6 @@ void APoliceChaseCharacter::DoJumpEnd()
 	// signal the character to stop jumping
 	StopJumping();
 }
+
+
+
