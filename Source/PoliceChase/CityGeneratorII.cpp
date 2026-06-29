@@ -5,6 +5,9 @@
 
 #include "Components/InstancedStaticMeshComponent.h"
 
+DEFINE_LOG_CATEGORY(LogCityBuilder)
+
+#pragma region Common
 
 ACityGeneratorII::ACityGeneratorII()
 {
@@ -18,6 +21,9 @@ void ACityGeneratorII::BeginPlay()
     Generate();
 }
 
+#pragma endregion
+
+#pragma region Generation Pipeline
 
 void ACityGeneratorII::Generate()
 {
@@ -25,10 +31,10 @@ void ACityGeneratorII::Generate()
     GridSize = FMath::Max(GridSize, 5);
 
     InitGrid();
-    PlaceRoads();
 
-    FRandomStream Rand(Seed);
-    PlaceBuildings(Rand);
+    Rand = FRandomStream(Seed);
+    PlaceRoads();
+    PlaceBuildings();
     SpawnInstances();
 }
 
@@ -36,129 +42,218 @@ void ACityGeneratorII::Clear()
 {
     ClearISMCs();
     Grid.Empty();
-    BuildingID.Empty();
-    MergedEast.Empty();
 }
-
 
 void ACityGeneratorII::InitGrid()
 {
     const int Total = GridSize * GridSize;
     Grid.Init(ETileType::Empty, Total);
     BuildingID.Init(-1, Total);
-    MergedEast.Init(false, Total);
 }
-
 
 void ACityGeneratorII::PlaceRoads()
 {
-    // perimeter
-    for (int i = 0; i < GridSize; ++i)
+    int center = GridSize / 2;
+
+#pragma region Outer perimeter
+    RoadHorizontalLine(0, GridSize - 1, 0);
+    RoadHorizontalLine(0, GridSize - 2, 0);
+    RoadHorizontalLine(0, GridSize - 1, GridSize - 1);
+    RoadHorizontalLine(0, GridSize - 2, GridSize - 2);
+    RoadVerticalLine(0, 0, GridSize - 1);
+    RoadVerticalLine(0, 0, GridSize - 2);
+    RoadVerticalLine(GridSize - 1, 0, GridSize - 1);
+    RoadVerticalLine(GridSize - 2, 0, GridSize - 2);
+#pragma endregion
+
+
+#pragma region Quadrants cross
+    bool oddWidth = MainRoadWidth % 2 == 1;
+    const int halfMainRoadWidth = MainRoadWidth / 2;
+    for (int offset = -halfMainRoadWidth; offset < halfMainRoadWidth + oddWidth; offset++)
     {
-        SetRoad(i, 0);
-        SetRoad(i, GridSize - 1);
-        SetRoad(0, i);
-        SetRoad(GridSize - 1, i);
+        RoadHorizontalLine(0, GridSize - 1, center + offset);
+        RoadVerticalLine(center + offset, 0, GridSize - 1);
+    }
+#pragma endregion
+
+#pragma region Landmark dedicated space
+    /*const int halfLandmarkDedicatedSpaceSize = LandmarkDedicatedSpaceSize / 2;
+    const int centerMinusHalf = center - halfLandmarkDedicatedSpaceSize;
+    const int centerPlusHalf = center + halfLandmarkDedicatedSpaceSize;
+    for (int offset = centerMinusHalf; offset < centerPlusHalf; offset++)
+        RoadHorizontalLine(
+            centerMinusHalf,
+            centerPlusHalf - 1,
+            offset
+        );*/
+#pragma endregion
+
+    // includes borders
+    const TArray<FQuadrant> quadrants = 
+    {
+        { 1,        1,        center - 1, center - 1 },  // topleft
+        { center + 1, 1,        GridSize - 2,   center - 1 },  // topright
+        { 1,        center + 1, center - 1, GridSize - 2   },  // bottomleft
+        { center + 1, center + 1, GridSize - 2,   GridSize - 2   },  // bottomright
+    };
+
+
+    for (const FQuadrant& quad : quadrants)
+    {
+        EFillMethod fillMethod = (EFillMethod) Rand.RandRange(0, (int) EFillMethod::Length - 1);
+
+        // auto [XO, Y0, X1, Y1] = quad;
+        switch (fillMethod)
+        {
+        case EFillMethod::Subdivison:
+            SubdivideBlock(quad.X0, quad.Y0, quad.X1, quad.Y1, 0);
+            break;
+            
+        case EFillMethod::PlainGrid:
+            FillPlainGrid(quad.X0, quad.Y0, quad.X1, quad.Y1);
+            break;
+
+        case EFillMethod::Length: // i messed up somewhere
+        default:
+            UE_LOG(LogCityBuilder, Error, TEXT("Messed up"));
+            break; // i messed up somewhere
+
+        }
+
     }
 
-    // inner (plain grid)
-    //for (int Y = 1; Y < GridSize - 1; ++Y)
-    //{
-    //    for (int X = 1; X < GridSize - 1; ++X)
-    //    {
-    //        // road when either X or Y is on a block boundary
-    //        if (X % BlockSize == 0 || Y % BlockSize == 0)
-    //            SetRoad(X, Y);
-    //    }
-    //}
-
-    // Recursively subdivide the interior
-    SubdivideBlock(1, 1, GridSize - 2, GridSize - 2, 0);
+    //// Recursively subdivide the interior
+    // SubdivideBlock(1, 1, GridSize - 2, GridSize - 2, 0); // do whole map
+    
 }
+
+void ACityGeneratorII::PlaceBuildings()
+{
+    int index;
+    for (int Y = 0; Y < GridSize; ++Y)
+    for (int X = 0; X < GridSize; ++X)
+        if (Grid[index = Index(X, Y)] == ETileType::Empty)
+            Grid[index] = ETileType::Building;
+}
+
+#pragma endregion
+
+#pragma region Fill methods
+
+//void ACityGeneratorII::SubdivideBlock(int X0, int Y0, int X1, int Y1, int Depth)
+//{
+//    int Width = X1 - X0;
+//    int Height = Y1 - Y0;
+//
+//    // stop subdividing if block too small
+//    if (Width < MinBlockSize && Height < MinBlockSize)
+//        return;
+//
+//    // Bias: prefer splitting the longer axis, but sometimes flip randomly
+//    bool bSplitHorizontal = (Height > Width);
+//    if (Rand.FRand() > .5f && Depth < MaxDepth)
+//        bSplitHorizontal = !bSplitHorizontal;
+//
+//    if (bSplitHorizontal && Height >= MinBlockSize)
+//    {
+//        // Pick a split Y somewhere in the middle third (avoids tiny slivers)
+//        int Margin = FMath::Max(1, Height / 4);
+//        int SplitY = Rand.RandRange(Y0 + Margin, Y1 - Margin);
+//
+//        for (int X = X0; X <= X1; ++X)
+//            SetRoad(X, SplitY);
+//
+//        SubdivideBlock(X0, Y0, X1, SplitY - 1, Depth + 1);
+//        SubdivideBlock(X0, SplitY + 1, X1, Y1, Depth + 1);
+//    }
+//    else if (!bSplitHorizontal && Width >= MinBlockSize)
+//    {
+//        int Margin = FMath::Max(1, Width / 4);
+//        int SplitX = Rand.RandRange(X0 + Margin, X1 - Margin);
+//
+//        for (int Y = Y0; Y <= Y1; ++Y)
+//            SetRoad(SplitX, Y);
+//
+//        SubdivideBlock(X0, Y0, SplitX - 1, Y1, Depth + 1);
+//        SubdivideBlock(SplitX + 1, Y0, X1, Y1, Depth + 1);
+//    }
+//}
+
 
 void ACityGeneratorII::SubdivideBlock(int X0, int Y0, int X1, int Y1, int Depth)
 {
     int Width = X1 - X0;
     int Height = Y1 - Y0;
 
-    // Stop subdividing when the block is too small
     if (Width < MinBlockSize && Height < MinBlockSize)
         return;
 
-    // Bias: prefer splitting the longer axis, but sometimes flip randomly
+    const int Half = RoadWidth / 2;
+
     bool bSplitHorizontal = (Height > Width);
-    if (FMath::RandBool() && Depth < MaxDepth)
+    if (Rand.FRand() > .5f && Depth < MaxDepth)
         bSplitHorizontal = !bSplitHorizontal;
 
     if (bSplitHorizontal && Height >= MinBlockSize)
     {
-        // Pick a split Y somewhere in the middle third (avoids tiny slivers)
-        int Margin = FMath::Max(1, Height / 4);
-        int SplitY = FMath::RandRange(Y0 + Margin, Y1 - Margin);
+        int Margin = FMath::Max(RoadWidth, Height / 4);
 
-        for (int X = X0; X <= X1; ++X)
-            SetRoad(X, SplitY);
+        // Bail out if there isn't enough room for two blocks + one road band
+        if (Y0 + Margin > Y1 - Margin)
+            return;
 
-        SubdivideBlock(X0, Y0, X1, SplitY - 1, Depth + 1);
-        SubdivideBlock(X0, SplitY + 1, X1, Y1, Depth + 1);
+        int SplitY = Rand.RandRange(Y0 + Margin, Y1 - Margin);
+
+        // Paint every lane of the road band
+        for (int Lane = 0; Lane < RoadWidth; ++Lane)
+            for (int X = X0; X <= X1; ++X)
+                SetRoad(X, SplitY - Half + Lane);
+
+        // Child blocks start/end outside the full road band
+        SubdivideBlock(X0, Y0, X1, SplitY - Half - 1, Depth + 1);
+        SubdivideBlock(X0, SplitY + Half, X1, Y1, Depth + 1);
     }
     else if (!bSplitHorizontal && Width >= MinBlockSize)
     {
-        int Margin = FMath::Max(1, Width / 4);
-        int SplitX = FMath::RandRange(X0 + Margin, X1 - Margin);
+        int Margin = FMath::Max(RoadWidth, Width / 4);
 
-        for (int Y = Y0; Y <= Y1; ++Y)
-            SetRoad(SplitX, Y);
+        if (X0 + Margin > X1 - Margin)
+            return;
 
-        SubdivideBlock(X0, Y0, SplitX - 1, Y1, Depth + 1);
-        SubdivideBlock(SplitX + 1, Y0, X1, Y1, Depth + 1);
+        int SplitX = Rand.RandRange(X0 + Margin, X1 - Margin);
+
+        for (int Lane = 0; Lane < RoadWidth; ++Lane)
+            for (int Y = Y0; Y <= Y1; ++Y)
+                SetRoad(SplitX - Half + Lane, Y);
+
+        SubdivideBlock(X0, Y0, SplitX - Half - 1, Y1, Depth + 1);
+        SubdivideBlock(SplitX + Half, Y0, X1, Y1, Depth + 1);
     }
 }
 
-void ACityGeneratorII::PlaceBuildings(FRandomStream& Rand)
+//void ACityGeneratorII::FillPlainGrid(int X0, int Y0, int X1, int Y1)
+//{
+//    for (; Y0 < Y1; ++Y0)
+//    for (; X0 < X1; ++X0)
+//        if (X0 % BlockSize == 0 || Y0 % BlockSize == 0)
+//            SetRoad(X0, Y0); // road when either X or Y is on a block boundary
+//}
+
+void ACityGeneratorII::FillPlainGrid(int X0, int Y0, int X1, int Y1)
 {
-    if (BuildingMeshes.Num() == 0)
-        return;
-
-    const int NumMeshes = BuildingMeshes.Num();
-
-    // assign building to non road tiles
-    int index;
-    for (int Y = 0; Y < GridSize; ++Y)
-    {
-        for (int X = 0; X < GridSize; ++X)
-        {
-            if (Grid[index = Index(X, Y)] == ETileType::Empty)
-            {
-                Grid[index] = ETileType::Building;
-                BuildingID[index] = Rand.RandRange(0, NumMeshes - 1);
-            }
-        }
-    }
-
-    //// Pass 2 – try to merge adjacent building tiles into 2×1 pairs (east–west)
-    ////          A merged pair re-uses the west tile's mesh scaled 2× on X.
-    //for (int Y = 0; Y < GridSize; ++Y)
-    //{
-    //    for (int X = 0; X < GridSize - 1; ++X)
-    //    {
-    //        const int IdxA = Index(X, Y);
-    //        const int IdxB = Index(X + 1, Y);
-
-    //        if (Grid[IdxA] == ETileType::Building && Grid[IdxB] == ETileType::Building &&
-    //            !MergedEast[IdxA] &&           // A not already used as left half
-    //            BuildingID[IdxB] != -1 &&       // B is free
-    //            Rand.FRand() < MergeProbability)
-    //        {
-    //            // Mark A as the anchor (left half) of a 2×1 building
-    //            MergedEast[IdxA] = true;
-    //            BuildingID[IdxB] = -1;         // B is swallowed – skip during spawn
-    //            // Keep BuildingID[IdxA] as the mesh to use
-    //        }
-    //    }
-    //}
+    for (int Y = Y0; Y < Y1; Y += BlockSize)
+    for (int road = 0; road < RoadWidth && Y + road < Y1; road++)
+        RoadHorizontalLine(X0, X1, Y + road);
+ 
+    for (int X = X0; X < X1; X += BlockSize)
+    for (int road = 0; road < RoadWidth && X + road < X1; road++)
+        RoadVerticalLine(X + road, Y0, Y1);
 }
 
+#pragma endregion
+
+#pragma region Instanced meshes handling
 
 void ACityGeneratorII::SpawnInstances()
 {
@@ -175,34 +270,38 @@ void ACityGeneratorII::SpawnInstances()
                 if (!Mesh)
                     continue;
 
-                UInstancedStaticMeshComponent* ISMC = GetOrCreateISMC(Mesh);
-                ISMC->AddInstance(MakeTransformForTile(X, Y, Yaw));
+                GetOrCreateISMC(Mesh)->AddInstance(MakeTransformForTile(X, Y, Yaw));
             }
             else if (Type == ETileType::Building)
             {
-                const int MeshIdx = BuildingID[Index(X, Y)];
-                if (MeshIdx < 0)
-                    continue; // swallowed by merge
+                TArray<UStaticMesh*> buildingMeshes = <:this:>(EQuadrant quadrant)
+                <%
+                    switch (quadrant)
+                    {
+                    case EQuadrant::TopLeft:  return BuildingMeshesQuad1;
+                    case EQuadrant::TopRight: return BuildingMeshesQuad2;
+                    case EQuadrant::BottomLeft: return BuildingMeshesQuad3;
+                    case EQuadrant::BottomRight: return BuildingMeshesQuad4;
 
-                if (!BuildingMeshes.IsValidIndex(MeshIdx))
+                    case EQuadrant::None:
+                    default: return TArray<UStaticMesh*>{};
+                    }
+                %> (GetTileQuadrant(X, Y));
+
+                if (buildingMeshes.Num() == 0)
                     continue;
-
-                UStaticMesh* Mesh = BuildingMeshes[MeshIdx];
+                
+                UStaticMesh* Mesh = buildingMeshes[Rand.RandRange(0, buildingMeshes.Num() - 1)];
                 if (!Mesh)
                     continue;
 
-                UInstancedStaticMeshComponent* ISMC = GetOrCreateISMC(Mesh);
-
-                // 2×1 merged building: scale X by 2, offset half a tile east
-                if (MergedEast[Index(X, Y)])
-                    ISMC->AddInstance(MakeTransformForTile(X, Y, 0.f, 2.f));
-                else
-                    ISMC->AddInstance(MakeTransformForTile(X, Y, 0.f, 1.f));
+                const FTransform& transform = MakeTransformForTile(X, Y, 0.f);
+                GetOrCreateISMC(Mesh)->AddInstance(transform);
+                GetOrCreateISMC(MeshRoadCross)->AddInstance(transform);
             }
         }
     }
 }
-
 
 UInstancedStaticMeshComponent* ACityGeneratorII::GetOrCreateISMC(UStaticMesh* Mesh)
 {
@@ -232,31 +331,9 @@ void ACityGeneratorII::ClearISMCs()
     ISMCMap.Empty();
 }
 
+#pragma endregion
 
-FTransform ACityGeneratorII::MakeTransformForTile(int X, int Y, float Yaw, float ScaleX) const
-{
-    FVector Loc(
-        (X + ScaleX * 0.5f) * TileSize,   // shift right by half for 2×1
-        (Y + 0.5f) * TileSize,
-        0.f
-    );
-
-    FRotator Rot(0.f, Yaw, 0.f);
-    FVector  Scale(ScaleX, 1.f, 1.f);
-
-    return FTransform(Rot, Loc + GetActorLocation(), Scale);
-}
-
-
-bool ACityGeneratorII::IsRoad(int X, int Y) const
-{
-    if (X < 0 || X >= GridSize)
-        return false;
-    if (Y < 0 || Y >= GridSize)
-        return false;
-
-    return Grid[Index(X, Y)] == ETileType::Road;
-}
+#pragma region Road
 
 ERoadType ACityGeneratorII::GetRelevantRoadTile(int X, int Y) const
 {
@@ -266,8 +343,19 @@ ERoadType ACityGeneratorII::GetRelevantRoadTile(int X, int Y) const
     const bool WestTileIsRoad = IsRoad(X - 1, Y);
     const int Count = NorthTileIsRoad + SouthTileIsRoad + WestTileIsRoad + EastTileIsRoad;
 
+
     if (Count == 4)
-        return ERoadType::Cross;
+    {
+       return ERoadType::Cross;
+       /* const bool HasAnyDiagonalRoad =
+            IsRoad(X + 1, Y + 1) ||
+            IsRoad(X - 1, Y + 1) ||
+            IsRoad(X + 1, Y - 1) ||
+            IsRoad(X - 1, Y - 1)
+        ;
+
+        return HasAnyDiagonalRoad ? ERoadType::Plain : ERoadType::Cross;*/
+    }
 
     if (Count == 3)
     {
@@ -319,7 +407,6 @@ UStaticMesh* ACityGeneratorII::GetRelevantMeshForRoad(ERoadType Type, float& Out
 
     switch (Type)
     {
-        // if straights
         case ERoadType::Straight_EW:
             OutYaw = 0;
             return MeshRoadStraightNS;
@@ -327,7 +414,6 @@ UStaticMesh* ACityGeneratorII::GetRelevantMeshForRoad(ERoadType Type, float& Out
             OutYaw = 90;
             return MeshRoadStraightNS;
 
-        // if corners
         case ERoadType::Corner_NW:
             OutYaw = 0;
             return MeshRoadCornerNE;
@@ -341,7 +427,6 @@ UStaticMesh* ACityGeneratorII::GetRelevantMeshForRoad(ERoadType Type, float& Out
             OutYaw = 270;
             return MeshRoadCornerNE;
 
-        // if T-shapes
         case ERoadType::TShape_N:
             OutYaw = 0;
             return MeshRoadTShapeN;
@@ -355,12 +440,13 @@ UStaticMesh* ACityGeneratorII::GetRelevantMeshForRoad(ERoadType Type, float& Out
             OutYaw = 270;
             return MeshRoadTShapeN;
 
-        // if cross
         case ERoadType::Cross:
             OutYaw = 0.f;
             return MeshRoadCross;
+        case ERoadType::Plain:
+            OutYaw = 0.f;
+            return MeshRoadPlain;
 
-            // if dead ends
         case ERoadType::Dead_N:
             OutYaw = 0.f;
             return MeshRoadDeadEnd;
@@ -378,4 +464,35 @@ UStaticMesh* ACityGeneratorII::GetRelevantMeshForRoad(ERoadType Type, float& Out
         default:
             return nullptr;
     }
+}
+
+#pragma endregion
+
+
+
+void ACityGeneratorII::SpawnRandomObject()
+{
+    if (objectsToSpawn.Num() == 0)
+        return;
+
+    int x;
+    int y;
+    do
+    {
+        x = Rand.RandRange(0, GridSize);
+        y = Rand.RandRange(0, GridSize);
+    } while (!IsRoad(x, y));
+    GetWorld()->SpawnActor<AActor>(
+        objectsToSpawn[FMath::RandRange(0, objectsToSpawn.Num() - 1)],
+        FTransform(
+            FRotator::ZeroRotator, 
+            FVector(
+                (x + 0.5f) * TileSize * Scale,
+                (y + 0.5f) * TileSize * Scale,
+                0.f
+            ) + GetActorLocation(),
+            FVector::OneVector
+        ),
+        spawnParams
+    );
 }
