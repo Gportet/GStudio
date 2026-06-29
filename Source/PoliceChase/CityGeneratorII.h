@@ -272,8 +272,10 @@ private:
     public:
         UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawn")
         TArray<TSubclassOf<AActor>> objectsToSpawn;
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawn")
+        float OffsetToGround = 100.f;
 
-        UFUNCTION(BlueprintCallable, Category = "Spawn")
+        UFUNCTION(CallInEditor, BlueprintCallable, Category = "Spawn")
         void SpawnRandomObject();
     private:
         const FActorSpawnParameters spawnParams = <:=:>()

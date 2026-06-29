@@ -490,6 +490,7 @@ void ACityGeneratorII::SpawnRandomObject()
         x = Rand.RandRange(0, GridSize);
         y = Rand.RandRange(0, GridSize);
     } while (!IsRoad(x, y));
+
     GetWorld()->SpawnActor<AActor>(
         objectsToSpawn[FMath::RandRange(0, objectsToSpawn.Num() - 1)],
         FTransform(
@@ -498,7 +499,7 @@ void ACityGeneratorII::SpawnRandomObject()
                 (x + 0.5f) * TileSize * Scale,
                 (y + 0.5f) * TileSize * Scale,
                 0.f
-            ) + GetActorLocation(),
+            ) + GetActorLocation() + FVector::UpVector * OffsetToGround,
             FVector::OneVector
         ),
         spawnParams
