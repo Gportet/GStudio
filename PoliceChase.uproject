@@ -42,6 +42,10 @@
 		{
 			"Name": "SteamSockets",
 			"Enabled": true
-		}
+		},
+		{
+			"Name": "ChaosVehiclesPlugin",
+			"Enabled": true
+		},
 	]
 }
