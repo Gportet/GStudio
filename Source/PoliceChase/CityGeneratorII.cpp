@@ -57,13 +57,13 @@ void ACityGeneratorII::PlaceRoads()
 
 #pragma region Outer perimeter
     RoadHorizontalLine(0, GridSize - 1, 0);
-    RoadHorizontalLine(0, GridSize - 2, 0);
+    RoadHorizontalLine(0, GridSize - 1, 1);
     RoadHorizontalLine(0, GridSize - 1, GridSize - 1);
-    RoadHorizontalLine(0, GridSize - 2, GridSize - 2);
+    RoadHorizontalLine(0, GridSize - 1, GridSize - 2);
     RoadVerticalLine(0, 0, GridSize - 1);
-    RoadVerticalLine(0, 0, GridSize - 2);
+    RoadVerticalLine(1, 0, GridSize - 1);
     RoadVerticalLine(GridSize - 1, 0, GridSize - 1);
-    RoadVerticalLine(GridSize - 2, 0, GridSize - 2);
+    RoadVerticalLine(GridSize - 2, 0, GridSize - 1);
 #pragma endregion
 
 
@@ -90,12 +90,20 @@ void ACityGeneratorII::PlaceRoads()
 #pragma endregion
 
     // includes borders
-    const TArray<FQuadrant> quadrants = 
+    //const TArray<FQuadrant> quadrants =
+    //{
+    //    { 1,        1,        center - 1, center - 1 },  // topleft
+    //    { center + 1, 1,        GridSize - 2,   center - 1 },  // topright
+    //    { 1,        center + 1, center - 1, GridSize - 2   },  // bottomleft
+    //    { center + 1, center + 1, GridSize - 2,   GridSize - 2   },  // bottomright
+    //};
+
+    const TArray<FQuadrant> quadrants =
     {
-        { 1,        1,        center - 1, center - 1 },  // topleft
-        { center + 1, 1,        GridSize - 2,   center - 1 },  // topright
-        { 1,        center + 1, center - 1, GridSize - 2   },  // bottomleft
-        { center + 1, center + 1, GridSize - 2,   GridSize - 2   },  // bottomright
+        {0, 0, center, center },
+        {center, 0, GridSize - 1, center },
+        { 0, center, center , GridSize - 1 },
+        { center, center, GridSize - 1, GridSize - 1},
     };
 
 
@@ -125,7 +133,7 @@ void ACityGeneratorII::PlaceRoads()
 
     //// Recursively subdivide the interior
     // SubdivideBlock(1, 1, GridSize - 2, GridSize - 2, 0); // do whole map
-    
+
 }
 
 void ACityGeneratorII::PlaceBuildings()
